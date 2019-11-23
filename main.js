@@ -224,6 +224,8 @@ Piece.prototype.getCellArray = function() {
     }
     return arr;
 }
+
+// returns true if all non-empty cells of piece are within 
 function canPlacePiece(grid, piece) {
     // check mask in grid boundaries
     var maskArray = piece.getCellArray();
@@ -296,9 +298,58 @@ function nextGameState() {
     else if (gameState === 'gameRunning') gameState = 'gameOver';
     else if (gameState === 'gameOver') gameState = 'gameStart';
 }
+
+/*
+
+*/
+function incrementCounter() {
+    downCounter += 1;
+}
+function resetCounter() {
+    downCounter = 0;
+}
+function setDownInterval() {
+    // set level based on score
+    for (var i = level; i < levelThreshold.length; i++) {
+        if (score > levelThreshold[i]) level = i;
+        else break;
+    }
+    downInterval = levelCounterTime[level];
+}
+function setActivePiece(piece) {
+    activePiece = piece;
+}
+function gridConditionViolated() {
+    // check game over
+    var cellArray = activePiece.getCellArray();
+    for (var i = 0; i < cellArray.length; i++) {
+        var cellInfo = cellArray[i];
+        if (grid.aboveGrid(cellInfo.x, cellInfo.y)) {
+            return true;
+        }
+    }
+    return false;
+}
+function activePieceLocked() {
+    transferPieceToGrid(grid, activePiece);
+
+    if (gridConditionViolated()) {
+        nextGameState();
+    }
+
+    score += getUnTetris(grid);
+
+    setDownInterval();
+    resetCounter();
+}
+function activePieceMoved() {
+
+}
+function activePieceUnmoved() {
+
+}
 function gameLoop() {
-    let state = getGameState();
-    // gameRunning
+    var testPiece = null;
     if (pendingInput) {
         var testPiece = activePiece.copy();
         if (pendingInput.dir === "left") testPiece.x -= 1;
@@ -307,50 +358,37 @@ function gameLoop() {
         else if (pendingInput.dir === "cc") testPiece.rot = (testPiece.rot + 3) % 4;
         else if (pendingInput.dir === "cw") testPiece.rot = (testPiece.rot + 1) % 4;
         else throw Error("INVALID INPUT -- update");
-
-        if (canPlacePiece(grid, testPiece)) {
-            activePiece = testPiece;
+    }
+    // if testPiece apply input
+    if (testPiece) {
+        if (pendingInput.dir === 'down' && !canPlacePiece(grid, testPiece)) {
+            activePieceLocked();
+            setActivePiece(nextPiece);
+            nextPiece = getNextPiece();
+        } else if (!canPlacePiece(grid, testPiece)) {
+            activePieceUnmoved();
+        } else if (canPlacePiece(grid, testPiece)) {
+            setActivePiece(testPiece);
+            activePieceMoved();
         }
     }
+    // apply down if necessary
     if (downCounter >= downInterval) {
-        // forget pending input, attempt going down, if can't, freeze piece and create new active piece
-        downCounter = 0;
+        resetCounter();
 
         var testPiece = activePiece.copy();
         testPiece.y += 1;
-        if (canPlacePiece(grid, testPiece)) activePiece = testPiece;
-        else {
-            // piece cannot fall, transfer, do game over
-
-            // interesting part
-            transferPieceToGrid(grid, activePiece);
-            // check game over
-
-            var cellArray = activePiece.getCellArray();
-            for (var i = 0; i < cellArray.length; i++) {
-                var cellInfo = cellArray[i];
-                if (grid.aboveGrid(cellInfo.x, cellInfo.y)) {
-                    nextGameState();
-                    break;
-                }
-            }
-            // otherwise
-            if (state === 'gameRunning') {
-                // check grid for full rows, and modify if necessary, update score
-                score += getUnTetris(grid);
-                activePiece = nextPiece;
-                nextPiece = getNextPiece();
-            }
+        if (canPlacePiece(grid, testPiece)){
+            setActivePiece(testPiece);
+            activePieceMoved();
+        } else {
+            activePieceLocked();
+            setActivePiece(nextPiece);
+            nextPiece = getNextPiece();
         }
     }
+    incrementCounter();
 
-    downCounter += 1;
-    // set level based on score
-    for (var i = level; i < levelThreshold.length; i++) {
-        if (score > levelThreshold[i]) level = i;
-        else break;
-    }
-    downInterval = levelCounterTime[level];
 }
 
 
